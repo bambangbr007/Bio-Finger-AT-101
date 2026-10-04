@@ -1,0 +1,729 @@
+import React, { useState } from 'react';
+import { useAttendance } from '../../context/AttendanceContext';
+import { 
+  Fingerprint, 
+  Clock, 
+  Calendar, 
+  MessageSquare, 
+  CheckCircle2, 
+  AlertTriangle, 
+  ChevronRight, 
+  Send, 
+  User, 
+  ShieldCheck, 
+  HelpCircle, 
+  Phone, 
+  FileText, 
+  ExternalLink,
+  Search,
+  School,
+  Sparkles,
+  Smartphone
+} from 'lucide-react';
+import { generateDirectWhatsAppUrl } from '../../utils/whatsappHelper';
+
+export const ParentMobileView: React.FC = () => {
+  const { 
+    students, 
+    selectedParentStudentId, 
+    setSelectedParentStudentId, 
+    attendanceRecords, 
+    activeDate, 
+    schoolConfig,
+    notificationLogs,
+    permissions,
+    submitPermission
+  } = useAttendance();
+
+  const [activeTab, setActiveTab] = useState<'home' | 'history' | 'permission' | 'profile'>('home');
+  const [deviceFrameMode, setDeviceFrameMode] = useState<boolean>(false);
+  const [studentSearchOpen, setStudentSearchOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Form state for leave/sick submission
+  const [permType, setPermType] = useState<'SAKIT' | 'IZIN'>('SAKIT');
+  const [permReason, setPermReason] = useState<string>('');
+  const [permNote, setPermNote] = useState<string>('');
+  const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
+
+  const currentStudent = students.find(s => s.id === selectedParentStudentId) || students[0];
+  const todayRecord = attendanceRecords.find(r => r.studentId === currentStudent.id && r.date === activeDate);
+  const studentPermissions = permissions.filter(p => p.studentId === currentStudent.id);
+  const studentNotifs = notificationLogs.filter(n => n.studentId === currentStudent.id);
+
+  const filteredStudents = students.filter(s => 
+    s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    s.pin.includes(searchQuery) ||
+    s.class.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleLeaveSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!permReason.trim()) return;
+    submitPermission(currentStudent.id, permType, permReason, activeDate, activeDate, permNote);
+    setSubmitSuccess(true);
+    setPermReason('');
+    setPermNote('');
+    setTimeout(() => setSubmitSuccess(false), 4000);
+  };
+
+  const getStatusBadge = () => {
+    if (!todayRecord) {
+      return {
+        label: 'Belum Melakukan Presensi',
+        subtext: 'Menunggu scan sidik jari di gerbang sekolah',
+        color: 'bg-slate-100 text-slate-700 border-slate-300',
+        icon: Clock,
+        textColor: 'text-slate-600'
+      };
+    }
+
+    switch (todayRecord.status) {
+      case 'HADIR_TEPAT':
+        return {
+          label: 'Hadir Tepat Waktu',
+          subtext: `Tercatat di BIO Finger AT-101 pukul ${todayRecord.checkInTime} WIB`,
+          color: 'bg-emerald-50 text-emerald-800 border-emerald-300',
+          icon: CheckCircle2,
+          textColor: 'text-emerald-700'
+        };
+      case 'TERLAMBAT':
+        return {
+          label: `Terlambat (${todayRecord.lateMinutes || 0} Menit)`,
+          subtext: `Tercatat di BIO Finger AT-101 pukul ${todayRecord.checkInTime} WIB`,
+          color: 'bg-amber-50 text-amber-900 border-amber-300',
+          icon: AlertTriangle,
+          textColor: 'text-amber-800'
+        };
+      case 'SAKIT':
+        return {
+          label: 'Sakit',
+          subtext: todayRecord.notes || 'Keterangan sakit telah divalidasi sekolah',
+          color: 'bg-blue-50 text-blue-800 border-blue-300',
+          icon: HelpCircle,
+          textColor: 'text-blue-700'
+        };
+      case 'IZIN':
+        return {
+          label: 'Izin',
+          subtext: todayRecord.notes || 'Surat izin disetujui pihak sekolah',
+          color: 'bg-purple-50 text-purple-800 border-purple-300',
+          icon: FileText,
+          textColor: 'text-purple-700'
+        };
+      case 'ALPHA':
+        return {
+          label: 'Tanpa Keterangan (Alpha)',
+          subtext: 'Tidak ada data presensi sidik jari hingga batas akhir',
+          color: 'bg-rose-50 text-rose-800 border-rose-300',
+          icon: AlertTriangle,
+          textColor: 'text-rose-700'
+        };
+      default:
+        return {
+          label: 'Belum Hadir',
+          subtext: 'Menunggu pemindaian jari',
+          color: 'bg-slate-100 text-slate-700 border-slate-300',
+          icon: Clock,
+          textColor: 'text-slate-600'
+        };
+    }
+  };
+
+  const statusInfo = getStatusBadge();
+  const StatusIcon = statusInfo.icon;
+
+  const content = (
+    <div className="w-full max-w-md mx-auto bg-slate-50 min-h-screen flex flex-col relative pb-20 shadow-xl border-x border-slate-200">
+      
+      {/* Top Header Bar */}
+      <div className="bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 text-white px-4 pt-4 pb-6 rounded-b-3xl shadow-lg">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur-md flex items-center justify-center">
+              <Fingerprint className="w-5 h-5 text-blue-200" />
+            </div>
+            <div>
+              <p className="text-[10px] text-blue-200 font-semibold tracking-wider uppercase">Portal Orang Tua Siswa</p>
+              <h2 className="text-sm font-bold truncate max-w-[190px]">{schoolConfig.schoolName}</h2>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setStudentSearchOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/25 text-xs text-blue-100 border border-white/20 backdrop-blur-sm transition-all"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>Ganti Siswa</span>
+          </button>
+        </div>
+
+        {/* Student Profile Card (Hero) */}
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3.5 flex items-center gap-3 shadow-inner">
+          <img 
+            src={currentStudent.avatarUrl} 
+            alt={currentStudent.name}
+            className="w-14 h-14 rounded-2xl bg-white/90 p-0.5 border-2 border-white/60 object-cover shadow-sm shrink-0" 
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <h3 className="text-base font-bold text-white truncate">{currentStudent.name}</h3>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-400 text-slate-900">
+                {currentStudent.class}
+              </span>
+            </div>
+            <p className="text-xs text-blue-100 mt-0.5">NISN: {currentStudent.nisn}</p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <span className="inline-flex items-center gap-1 text-[11px] text-blue-200 bg-blue-950/40 px-2 py-0.5 rounded-full border border-blue-400/30">
+                <Fingerprint className="w-3 h-3 text-emerald-400" />
+                PIN BioFinger: <strong className="text-white">{currentStudent.pin}</strong>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Tab Content */}
+      <div className="flex-1 px-3.5 -mt-3 space-y-3.5">
+
+        {/* TAB 1: BERANDA */}
+        {activeTab === 'home' && (
+          <>
+            {/* Live Attendance Status Today */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+              <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-slate-800">Status Hari Ini</span>
+                    <p className="text-[11px] text-slate-400">{activeDate}</p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-medium bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                  BIO Finger AT-101
+                </span>
+              </div>
+
+              {/* Status Banner */}
+              <div className={`rounded-xl p-3 border ${statusInfo.color} mb-3.5 transition-all`}>
+                <div className="flex items-start gap-2.5">
+                  <StatusIcon className={`w-5 h-5 shrink-0 mt-0.5 ${statusInfo.textColor}`} />
+                  <div>
+                    <h4 className={`text-sm font-bold ${statusInfo.textColor}`}>{statusInfo.label}</h4>
+                    <p className="text-xs opacity-90 mt-0.5">{statusInfo.subtext}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* In/Out Times Timeline */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 text-center relative overflow-hidden">
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                    Waktu Masuk
+                  </span>
+                  <div className="text-lg font-extrabold text-slate-800 font-mono">
+                    {todayRecord?.checkInTime ? `${todayRecord.checkInTime} WIB` : '--:--:--'}
+                  </div>
+                  <span className="text-[10px] text-emerald-600 font-medium mt-0.5 block">
+                    {todayRecord?.checkInTime ? '✓ Terverifikasi Jari' : 'Belum Scan'}
+                  </span>
+                  {todayRecord?.checkInTime && (
+                    <div className="text-[9px] text-slate-400 mt-1 truncate">
+                      {todayRecord.checkInDevice || 'Gate-1 AT-101'}
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 text-center relative overflow-hidden">
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                    Waktu Pulang
+                  </span>
+                  <div className="text-lg font-extrabold text-slate-800 font-mono">
+                    {todayRecord?.checkOutTime ? `${todayRecord.checkOutTime} WIB` : '--:--:--'}
+                  </div>
+                  <span className="text-[10px] text-blue-600 font-medium mt-0.5 block">
+                    {todayRecord?.checkOutTime ? '✓ Terverifikasi Jari' : 'Batas 14:30 WIB'}
+                  </span>
+                  {todayRecord?.checkOutTime && (
+                    <div className="text-[9px] text-slate-400 mt-1 truncate">
+                      {todayRecord.checkOutDevice || 'Gate-2 AT-101'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Real-Time WhatsApp Notification Preview Box */}
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50/50 rounded-2xl p-4 border border-emerald-200/80 shadow-sm">
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-sm">
+                    <MessageSquare className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-emerald-950">Notifikasi WhatsApp Real-Time</h4>
+                    <p className="text-[10px] text-emerald-700">Terkirim ke No: +{currentStudent.parentPhone}</p>
+                  </div>
+                </div>
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 bg-emerald-600 text-white rounded-full">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Auto Sent
+                </span>
+              </div>
+
+              {/* Chat Bubble Preview */}
+              <div className="bg-white rounded-xl p-3 shadow-xs border border-emerald-100 text-xs text-slate-700 leading-relaxed font-sans mb-3">
+                <div className="text-[10px] text-slate-400 font-mono mb-1.5 flex items-center justify-between">
+                  <span>Pesan Otomatis Mesin BIO Finger AT-101</span>
+                  <span>{todayRecord?.checkInTime || '07:00'} WIB</span>
+                </div>
+                {todayRecord?.checkInTime ? (
+                  <div>
+                    <p className="font-semibold text-slate-900">
+                      Yth. {currentStudent.parentName},
+                    </p>
+                    <p className="mt-1">
+                      Siswa <strong>{currentStudent.name}</strong> ({currentStudent.class}) telah terdeteksi hadir pada mesin <strong>BIO Finger AT-101</strong> pukul <strong>{todayRecord.checkInTime} WIB</strong> ({todayRecord.status === 'TERLAMBAT' ? `Terlambat ${todayRecord.lateMinutes} menit` : 'Tepat Waktu'}).
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-2 italic">
+                      Laporan otomatis dikirimkan ke WhatsApp & Email orang tua siswa.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-slate-500 italic">
+                    Notifikasi kehadiran akan otomatis terkirim ke WhatsApp Bapak/Ibu segera setelah ananda menempelkan sidik jari pada mesin BIO Finger AT-101 di gerbang sekolah.
+                  </p>
+                )}
+              </div>
+
+              {/* Direct Open WhatsApp Link Button */}
+              {todayRecord?.checkInTime && (
+                <a
+                  href={generateDirectWhatsAppUrl(
+                    currentStudent.parentPhone, 
+                    `Halo Admin Sekolah, saya orang tua dari ${currentStudent.name} (${currentStudent.class}). Saya sudah menerima notifikasi kehadiran ananda hari ini pukul ${todayRecord.checkInTime}. Terima kasih.`
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl text-xs font-bold shadow-sm transition-all"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Buka Pesan di WhatsApp Saya</span>
+                  <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                </a>
+              )}
+            </div>
+
+            {/* Quick Action: Ajukan Izin / Sakit shortcut */}
+            <div className="bg-white rounded-2xl p-3.5 border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h5 className="text-xs font-bold text-slate-800">Siswa Berhalangan Hadir?</h5>
+                  <p className="text-[11px] text-slate-500">Kirim surat izin atau keterangan sakit online</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveTab('permission')}
+                className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shrink-0 transition-all"
+              >
+                Ajukan
+              </button>
+            </div>
+
+            {/* Machine & Biometric Verification Info */}
+            <div className="bg-slate-100/80 rounded-2xl p-3.5 border border-slate-200 text-xs text-slate-600">
+              <div className="flex items-center gap-2 mb-2 font-semibold text-slate-800">
+                <ShieldCheck className="w-4 h-4 text-blue-600" />
+                <span>Keamanan Presensi Terjamin</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-slate-500">
+                Presensi menggunakan sensor optik biometrik <strong>BIO Finger AT-101</strong> anti-titip absen dengan verifikasi sidik jari aktif dan integrasi awan real-time.
+              </p>
+            </div>
+          </>
+        )}
+
+        {/* TAB 2: RIWAYAT BULANAN */}
+        {activeTab === 'history' && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800">Riwayat Presensi Ananda</h3>
+                <p className="text-xs text-slate-400">Rekapitulasi Kehadiran Bulan Ini</p>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full">
+                Semester Ganjil
+              </span>
+            </div>
+
+            {/* Monthly Recap Stat Badges */}
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2">
+                <span className="text-[10px] text-emerald-700 font-semibold block">Tepat</span>
+                <span className="text-base font-bold text-emerald-800">21</span>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-2">
+                <span className="text-[10px] text-amber-700 font-semibold block">Terlambat</span>
+                <span className="text-base font-bold text-amber-800">1</span>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-2">
+                <span className="text-[10px] text-blue-700 font-semibold block">Sakit</span>
+                <span className="text-base font-bold text-blue-800">1</span>
+              </div>
+              <div className="bg-purple-50 border border-purple-200 rounded-xl p-2">
+                <span className="text-[10px] text-purple-700 font-semibold block">Izin</span>
+                <span className="text-base font-bold text-purple-800">0</span>
+              </div>
+            </div>
+
+            {/* List of recent attendance logs */}
+            <div className="space-y-2.5 pt-2">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Log Pemindaian Terkini</h4>
+              
+              {/* Today's record */}
+              <div className="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between text-xs">
+                <div>
+                  <div className="flex items-center gap-1.5 font-semibold text-slate-800">
+                    <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                    <span>{activeDate} (Hari Ini)</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Masuk: <strong>{todayRecord?.checkInTime || '-'}</strong> • Pulang: <strong>{todayRecord?.checkOutTime || '-'}</strong>
+                  </p>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  todayRecord?.status === 'HADIR_TEPAT' ? 'bg-emerald-100 text-emerald-800' :
+                  todayRecord?.status === 'TERLAMBAT' ? 'bg-amber-100 text-amber-800' : 'bg-slate-200 text-slate-700'
+                }`}>
+                  {todayRecord?.status || 'BELUM HADIR'}
+                </span>
+              </div>
+
+              {/* Past mock logs */}
+              {[
+                { date: '2026-10-02', in: '06:42:10', out: '14:45:15', status: 'HADIR_TEPAT', late: 0 },
+                { date: '2026-10-01', in: '06:38:44', out: '14:35:20', status: 'HADIR_TEPAT', late: 0 },
+                { date: '2026-09-30', in: '07:22:18', out: '14:40:02', status: 'TERLAMBAT', late: 7 },
+                { date: '2026-09-29', in: '06:45:00', out: '14:35:00', status: 'HADIR_TEPAT', late: 0 },
+                { date: '2026-09-28', in: '06:50:11', out: '14:42:09', status: 'HADIR_TEPAT', late: 0 },
+              ].map((item, idx) => (
+                <div key={idx} className="p-3 rounded-xl border border-slate-100 bg-white hover:bg-slate-50 flex items-center justify-between text-xs transition-colors">
+                  <div>
+                    <div className="font-semibold text-slate-800">{item.date}</div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Masuk: <strong>{item.in}</strong> • Pulang: <strong>{item.out}</strong>
+                    </p>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    item.status === 'HADIR_TEPAT' 
+                      ? 'bg-emerald-100 text-emerald-800' 
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {item.status === 'HADIR_TEPAT' ? 'Tepat Waktu' : `Terlambat ${item.late}m`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: PENGAJUAN IZIN / SAKIT */}
+        {activeTab === 'permission' && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-4">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Form Pengajuan Izin / Sakit</h3>
+              <p className="text-xs text-slate-400">Pemberitahuan resmi langsung ke Guru Piket & Admin</p>
+            </div>
+
+            {submitSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Pengajuan berhasil dikirim! Menunggu konfirmasi Guru Piket.</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLeaveSubmit} className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Jenis Keterangan</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPermType('SAKIT')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                      permType === 'SAKIT'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    🏥 Sakit (Surat Dokter)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPermType('IZIN')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold border transition-all ${
+                      permType === 'IZIN'
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    📝 Izin Tertulis
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Alasan Berhalangan Hadir</label>
+                <textarea
+                  rows={3}
+                  value={permReason}
+                  onChange={(e) => setPermReason(e.target.value)}
+                  placeholder="Contoh: Mengalami demam dan flu sejak semalam, sedang beristirahat..."
+                  required
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700 block mb-1">Catatan Tambahan Orang Tua</label>
+                <input
+                  type="text"
+                  value={permNote}
+                  onChange={(e) => setPermNote(e.target.value)}
+                  placeholder="Contoh: Mohon izin istirahat 1 hari"
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-xs font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5 transition-all"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Kirim Surat Izin ke Sekolah</span>
+              </button>
+            </form>
+
+            {/* Existing Submissions */}
+            {studentPermissions.length > 0 && (
+              <div className="pt-3 border-t border-slate-100">
+                <h4 className="text-xs font-bold text-slate-700 mb-2">Riwayat Pengajuan Ananda</h4>
+                <div className="space-y-2">
+                  {studentPermissions.map(p => (
+                    <div key={p.id} className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-slate-800">{p.type} • {p.startDate}</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          p.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
+                          p.status === 'REJECTED' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {p.status === 'APPROVED' ? 'Disetujui' : p.status === 'REJECTED' ? 'Ditolak' : 'Menunggu'}
+                        </span>
+                      </div>
+                      <p className="text-slate-600 text-[11px]">{p.reason}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: PROFIL & MESIN AT-101 */}
+        {activeTab === 'profile' && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-4">
+            <div className="text-center pb-3 border-b border-slate-100">
+              <img 
+                src={currentStudent.avatarUrl} 
+                alt={currentStudent.name}
+                className="w-16 h-16 rounded-full mx-auto border-2 border-blue-500 p-0.5 bg-slate-100 shadow-sm"
+              />
+              <h3 className="text-base font-bold text-slate-800 mt-2">{currentStudent.name}</h3>
+              <p className="text-xs text-slate-500">{currentStudent.class} • NISN: {currentStudent.nisn}</p>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              <div className="flex justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-500">Nama Wali / Orang Tua:</span>
+                <span className="font-semibold text-slate-800">{currentStudent.parentName}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-500">No. WhatsApp Notifikasi:</span>
+                <span className="font-semibold text-emerald-700">+{currentStudent.parentPhone}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-500">Email Notifikasi:</span>
+                <span className="font-semibold text-slate-800">{currentStudent.parentEmail}</span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-500">PIN Mesin AT-101:</span>
+                <span className="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                  {currentStudent.pin}
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5 border-b border-slate-100">
+                <span className="text-slate-500">Status Sidik Jari:</span>
+                <span className="font-semibold text-emerald-700 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Terdaftar di AT-101
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5">
+                <span className="text-slate-500">Kartu RFID Cadangan:</span>
+                <span className="font-mono text-slate-700">{currentStudent.rfidCard}</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900">
+              <p className="font-bold mb-1">Butuh Bantuan Presensi?</p>
+              <p className="text-[11px] text-blue-700 leading-relaxed">
+                Hubungi Tata Usaha / Guru Piket {schoolConfig.schoolName} bila ada pergantian nomor WhatsApp wali murid atau kendala pemindaian sidik jari.
+              </p>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* Sticky Native-Like Bottom Navigation Bar for Smartphone */}
+      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200 py-2 px-3 flex items-center justify-around z-40 shadow-lg">
+        <button
+          onClick={() => setActiveTab('home')}
+          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+            activeTab === 'home' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <Fingerprint className="w-5 h-5" />
+          <span className="text-[10px]">Beranda</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+            activeTab === 'history' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <Calendar className="w-5 h-5" />
+          <span className="text-[10px]">Riwayat</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('permission')}
+          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+            activeTab === 'permission' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <FileText className="w-5 h-5" />
+          <span className="text-[10px]">Izin / Sakit</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('profile')}
+          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+            activeTab === 'profile' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <User className="w-5 h-5" />
+          <span className="text-[10px]">Profil</span>
+        </button>
+      </div>
+
+      {/* Modal: Student Selector (Allows testing all 480 students easily) */}
+      {studentSearchOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3">
+          <div className="bg-white rounded-2xl w-full max-w-sm max-h-[80vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
+            <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <h4 className="text-sm font-bold">Pilih Akun Siswa (480 Siswa)</h4>
+                <p className="text-[11px] text-slate-400">Simulasi tampilan orang tua per siswa</p>
+              </div>
+              <button 
+                onClick={() => setStudentSearchOpen(false)}
+                className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 border-b border-slate-100">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari nama siswa, PIN BioFinger, atau kelas..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-100 border border-transparent focus:bg-white focus:border-blue-500 focus:outline-none"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 divide-y divide-slate-100">
+              {filteredStudents.slice(0, 50).map(st => (
+                <button
+                  key={st.id}
+                  onClick={() => {
+                    setSelectedParentStudentId(st.id);
+                    setStudentSearchOpen(false);
+                  }}
+                  className={`w-full text-left p-2.5 rounded-xl flex items-center gap-2.5 transition-colors ${
+                    st.id === currentStudent.id ? 'bg-blue-50 text-blue-900' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <img src={st.avatarUrl} alt={st.name} className="w-8 h-8 rounded-lg bg-slate-200" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-800 truncate">{st.name}</p>
+                    <p className="text-[10px] text-slate-400">
+                      {st.class} • PIN: {st.pin} • Wali: {st.parentName}
+                    </p>
+                  </div>
+                  {st.id === currentStudent.id && (
+                    <span className="text-xs text-blue-600 font-bold">✓ Aktif</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-2.5 bg-slate-50 border-t border-slate-100 text-center text-[11px] text-slate-500">
+              Menampilkan {Math.min(50, filteredStudents.length)} dari 480 siswa
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-slate-900/90 py-0 sm:py-6">
+      {/* Device Frame Switcher Banner for Desktop Testers */}
+      <div className="max-w-md mx-auto mb-3 px-3 flex items-center justify-between text-xs text-slate-300">
+        <div className="flex items-center gap-1.5">
+          <Smartphone className="w-4 h-4 text-emerald-400" />
+          <span className="font-medium">Mode Hp Orang Tua: Pas Layar, 0 Delay</span>
+        </div>
+        <button
+          onClick={() => setDeviceFrameMode(!deviceFrameMode)}
+          className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] border border-slate-700"
+        >
+          {deviceFrameMode ? 'Layar Penuh' : 'Frame Mockup HP'}
+        </button>
+      </div>
+
+      {deviceFrameMode ? (
+        <div className="max-w-sm mx-auto my-4 bg-slate-950 p-3 rounded-[40px] shadow-2xl border-4 border-slate-800">
+          <div className="w-32 h-4 bg-slate-800 rounded-full mx-auto mb-2"></div>
+          <div className="rounded-[30px] overflow-hidden bg-white">
+            {content}
+          </div>
+        </div>
+      ) : (
+        content
+      )}
+    </div>
+  );
+};

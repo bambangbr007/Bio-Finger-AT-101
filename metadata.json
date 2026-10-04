@@ -1,0 +1,6 @@
+{
+  "name": "BioFinger AT-101 Smart School Attendance",
+  "description": "Sistem Presensi Siswa Biometrik Cloud BioFinger AT-101 dengan sinkronisasi spreadsheet/excel, notifikasi otomatis WhatsApp & Email ke Orang Tua, serta dashboard multi-role responsif.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

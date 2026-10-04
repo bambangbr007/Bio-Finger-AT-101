@@ -1,0 +1,20 @@
+{
+  "name": "biofinger-at101-daemon",
+  "version": "1.0.0",
+  "description": "Background Service Otomatis Penarik Presensi BioFinger AT-101 (ZKTeco Port 4370) & Notifikasi WhatsApp Orang Tua",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "test-connection": "node test-socket.js",
+    "test-cutoff": "RUN_NOW=true node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "node-cron": "^3.0.3",
+    "winston": "^3.17.0",
+    "zklib-js": "^1.0.8"
+  }
+}

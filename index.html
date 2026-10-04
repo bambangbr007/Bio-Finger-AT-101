@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      (function () {
+        try {
+          var nativeFetch = typeof window !== 'undefined' && window.fetch ? window.fetch.bind(window) : undefined;
+          var _currentFetch = nativeFetch;
+          var fetchDescriptor = {
+            get: function () {
+              return _currentFetch;
+            },
+            set: function (newFetch) {
+              _currentFetch = newFetch;
+            },
+            configurable: true,
+            enumerable: true
+          };
+          if (typeof window !== 'undefined') {
+            try {
+              Object.defineProperty(window, 'fetch', fetchDescriptor);
+            } catch (e1) {}
+          }
+          if (typeof Window !== 'undefined' && Window.prototype) {
+            try {
+              Object.defineProperty(Window.prototype, 'fetch', fetchDescriptor);
+            } catch (e2) {}
+          }
+          if (typeof globalThis !== 'undefined' && globalThis !== window) {
+            try {
+              Object.defineProperty(globalThis, 'fetch', fetchDescriptor);
+            } catch (e3) {}
+          }
+        } catch (err) {}
+      })();
+    </script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>BioFinger AT-101 Smart School Attendance</title>
+    <meta name="description" content="Sistem Presensi Siswa Biometrik Cloud BioFinger AT-101 dengan notifikasi otomatis WhatsApp & Email ke Orang Tua, serta dashboard multi-role responsif." />
+    <meta property="og:title" content="BioFinger AT-101 Smart School Attendance" />
+    <meta property="og:description" content="Sistem Presensi Siswa Biometrik Cloud BioFinger AT-101 dengan notifikasi otomatis WhatsApp & Email ke Orang Tua, serta dashboard multi-role responsif." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#1e3a8a" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  </head>
+  <body class="bg-slate-50 text-slate-900 font-sans antialiased overflow-x-hidden selection:bg-blue-500 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

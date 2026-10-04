@@ -1,0 +1,19 @@
+[Unit]
+Description=BioFinger AT-101 Automated School Attendance & WhatsApp Daemon
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/biofinger-daemon
+ExecStart=/usr/bin/node /opt/biofinger-daemon/index.js
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=biofinger-daemon
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
