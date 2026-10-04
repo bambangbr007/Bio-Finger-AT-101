@@ -90,20 +90,16 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const getTodayStr = () => new Date().toISOString().split('T')[0];
   const [activeDate, setActiveDate] = useState<string>(getTodayStr());
 
-  // Current logged in user
+  // Current logged in user (starts null so LoginPage is shown on first visit)
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
-    const saved = localStorage.getItem('biofinger_auth_user');
+    const saved = sessionStorage.getItem('biofinger_auth_user');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.id && parsed.role) return parsed;
+      } catch (e) {}
     }
-    // Default logged in as ADMIN for immediate convenience, but can log out to see Login Page!
-    return {
-      id: 'USR-ADMIN-01',
-      role: 'ADMIN',
-      name: 'Siti Rahmawati, S.Pd. (Guru Piket)',
-      usernameOrEmail: 'admin@sekolah.sch.id',
-      teacherId: 'TCH-002'
-    };
+    return null;
   });
 
   const [currentRole, setCurrentRole] = useState<UserRole>(() => {
@@ -353,8 +349,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   useEffect(() => {
     if (currentUser) {
-      localStorage.setItem('biofinger_auth_user', JSON.stringify(currentUser));
+      sessionStorage.setItem('biofinger_auth_user', JSON.stringify(currentUser));
+      setCurrentRole(currentUser.role);
     } else {
+      sessionStorage.removeItem('biofinger_auth_user');
       localStorage.removeItem('biofinger_auth_user');
     }
   }, [currentUser]);
@@ -438,6 +436,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const logout = () => {
     setCurrentUser(null);
+    sessionStorage.removeItem('biofinger_auth_user');
     localStorage.removeItem('biofinger_auth_user');
   };
 

@@ -21,10 +21,17 @@ import {
   CheckCircle2,
   Cpu,
   GraduationCap,
-  Sparkles
+  Sparkles,
+  Rocket,
+  Tv
 } from 'lucide-react';
 
-export const AdminDashboard: React.FC = () => {
+interface AdminDashboardProps {
+  onOpenTrialKit?: () => void;
+  onOpenKiosk?: () => void;
+}
+
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onOpenTrialKit, onOpenKiosk }) => {
   const { recentScans, permissions, notificationLogs, teachers } = useAttendance();
   const [activeTab, setActiveTab] = useState<'scan' | 'realtime' | 'students' | 'teachers' | 'enrollment' | 'excel' | 'broadcast' | 'permissions'>('scan');
   const [enrollTarget, setEnrollTarget] = useState<{ id: string; type: 'STUDENT' | 'TEACHER' } | null>(null);
@@ -42,8 +49,9 @@ export const AdminDashboard: React.FC = () => {
       {/* High Level KPI Metrics */}
       <AttendanceAnalytics />
 
-      {/* Admin Navigation Sub-Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2">
+      {/* Admin Navigation Sub-Tabs & Action Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-2">
+        <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => setActiveTab('scan')}
           className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
@@ -147,6 +155,32 @@ export const AdminDashboard: React.FC = () => {
             </span>
           )}
         </button>
+        </div>
+
+        {/* Right Action Buttons */}
+        <div className="flex items-center gap-2">
+          {onOpenKiosk && (
+            <button
+              onClick={onOpenKiosk}
+              className="px-3.5 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-800 text-xs font-bold transition-all border border-indigo-200 flex items-center gap-1.5"
+              title="Buka Layar Kiosk TV Gerbang Sekolah"
+            >
+              <Tv className="w-4 h-4 text-indigo-600" />
+              <span>Layar Kiosk Gerbang</span>
+            </button>
+          )}
+
+          {onOpenTrialKit && (
+            <button
+              onClick={onOpenTrialKit}
+              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5"
+              title="Buka Panduan & Alat Uji Coba Konsumen"
+            >
+              <Rocket className="w-4 h-4" />
+              <span>Pilot Kit</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tab Contents */}

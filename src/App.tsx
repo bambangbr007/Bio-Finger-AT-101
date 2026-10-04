@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AttendanceProvider, useAttendance } from './context/AttendanceContext';
 import { Header } from './components/Header';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { SuperAdminControl } from './components/superadmin/SuperAdminControl';
 import { ParentMobileView } from './components/parent/ParentMobileView';
 import { LoginPage } from './components/auth/LoginPage';
+import { TrialPilotKitModal } from './components/trial/TrialPilotKitModal';
+import { LobbyKioskDisplay } from './components/admin/LobbyKioskDisplay';
 
 const MainContent: React.FC = () => {
   const { currentRole, currentUser } = useAttendance();
+  const [isTrialKitOpen, setIsTrialKitOpen] = useState<boolean>(false);
+  const [isKioskOpen, setIsKioskOpen] = useState<boolean>(false);
 
   if (!currentUser) {
     return <LoginPage />;
@@ -15,7 +19,10 @@ const MainContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
-      <Header />
+      <Header 
+        onOpenTrialKit={() => setIsTrialKitOpen(true)}
+        onOpenKiosk={() => setIsKioskOpen(true)}
+      />
 
       <main className="flex-1">
         {currentRole === 'PARENT' ? (
@@ -23,10 +30,27 @@ const MainContent: React.FC = () => {
         ) : (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             {currentRole === 'SUPER_ADMIN' && <SuperAdminControl />}
-            {currentRole === 'ADMIN' && <AdminDashboard />}
+            {currentRole === 'ADMIN' && (
+              <AdminDashboard 
+                onOpenTrialKit={() => setIsTrialKitOpen(true)}
+                onOpenKiosk={() => setIsKioskOpen(true)}
+              />
+            )}
           </div>
         )}
       </main>
+
+      {/* Lobby Kiosk Fullscreen Mode */}
+      {isKioskOpen && (
+        <LobbyKioskDisplay onClose={() => setIsKioskOpen(false)} />
+      )}
+
+      {/* Trial Pilot Kit Modal */}
+      <TrialPilotKitModal 
+        isOpen={isTrialKitOpen} 
+        onClose={() => setIsTrialKitOpen(false)}
+        onOpenKiosk={() => setIsKioskOpen(true)}
+      />
 
       {/* Footer (Only shown in Super Admin / Admin modes) */}
       {currentRole !== 'PARENT' && (

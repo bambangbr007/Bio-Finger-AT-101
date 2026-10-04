@@ -11,19 +11,24 @@ import {
   MessageSquare, 
   Sparkles,
   LogOut,
-  Database
+  Database,
+  Rocket,
+  Tv
 } from 'lucide-react';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onOpenTrialKit?: () => void;
+  onOpenKiosk?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onOpenTrialKit, onOpenKiosk }) => {
   const { 
     currentRole, 
-    setCurrentRole, 
     activeDate, 
     setActiveDate, 
     schoolConfig, 
     students, 
     selectedParentStudentId, 
-    setSelectedParentStudentId,
     currentUser,
     logout,
     supabaseConfig
@@ -32,7 +37,7 @@ export const Header: React.FC = () => {
   const selectedStudent = students.find(s => s.id === selectedParentStudentId) || students[0];
 
   return (
-    <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-50 shadow-md">
+    <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-md">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-2">
           
@@ -46,9 +51,9 @@ export const Header: React.FC = () => {
                 <h1 className="font-bold text-base sm:text-lg tracking-tight truncate">
                   BIO Finger <span className="text-blue-400 font-extrabold">AT-101</span>
                 </h1>
-                <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Cloud Bridge
+                <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                  Siap Trial Konsumen
                 </span>
               </div>
               <p className="text-xs text-slate-400 truncate hidden sm:block">
@@ -57,88 +62,70 @@ export const Header: React.FC = () => {
             </div>
           </div>
 
-          {/* Quick Info & Date Selector (Hidden on small mobile) */}
-          <div className="hidden lg:flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700 text-xs">
-              <Calendar className="w-4 h-4 text-blue-400" />
-              <input 
-                type="date"
-                value={activeDate}
-                onChange={(e) => setActiveDate(e.target.value)}
-                className="bg-transparent text-slate-200 outline-none cursor-pointer text-xs font-medium"
-              />
-            </div>
+          {/* Quick Action Buttons: Pilot Kit & Kiosk */}
+          <div className="flex items-center gap-2">
+            {onOpenTrialKit && (
+              <button
+                onClick={onOpenTrialKit}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 active:scale-95 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 flex items-center gap-1.5"
+                title="Buka Pusat Panduan Uji Coba Konsumen"
+              >
+                <Rocket className="w-4 h-4 fill-slate-950" />
+                <span className="hidden sm:inline">Panduan Trial Konsumen</span>
+                <span className="sm:hidden">Trial Kit</span>
+              </button>
+            )}
 
-            <div className="flex items-center gap-1.5 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700 text-xs text-slate-300">
-              <Wifi className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="font-mono text-slate-400">192.168.1.201:4370</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 bg-emerald-950/40 border border-emerald-800/50 px-2.5 py-1.5 rounded-lg text-xs text-emerald-300">
-              <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-              <span>WhatsApp: Auto On</span>
-            </div>
-
-            <div className={`hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border ${
-              supabaseConfig?.connected
-                ? 'bg-teal-950/60 border-teal-700/60 text-teal-300'
-                : 'bg-slate-800/80 border-slate-700 text-slate-300'
-            }`}>
-              <Database className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{supabaseConfig?.connected ? 'Supabase: Sync' : 'Supabase: Ready'}</span>
-            </div>
+            {onOpenKiosk && (
+              <button
+                onClick={onOpenKiosk}
+                className="px-3 py-1.5 rounded-xl bg-indigo-600/80 hover:bg-indigo-600 active:scale-95 text-white font-bold text-xs transition-all border border-indigo-400/30 flex items-center gap-1.5"
+                title="Layar Kiosk Gerbang / TV Lobby Sekolah"
+              >
+                <Tv className="w-4 h-4 text-indigo-300" />
+                <span className="hidden md:inline">Layar Kiosk Gerbang</span>
+              </button>
+            )}
           </div>
 
-          {/* Role Switcher & User Profile / Logout */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 bg-slate-800/90 p-1 rounded-xl border border-slate-700">
-              <button
-                onClick={() => setCurrentRole('SUPER_ADMIN')}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  currentRole === 'SUPER_ADMIN'
-                    ? 'bg-amber-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                }`}
-                title="Super Admin (Laptop/PC)"
-              >
-                <ShieldAlert className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Super Admin</span>
-              </button>
+          {/* Authenticated User Profile & Logout */}
+          <div className="flex items-center gap-2.5">
+            {currentUser && (
+              <div className="flex items-center gap-2.5 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
+                  currentRole === 'SUPER_ADMIN' 
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
+                    : currentRole === 'ADMIN'
+                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                }`}>
+                  {currentRole === 'SUPER_ADMIN' && <ShieldAlert className="w-4 h-4 text-amber-300" />}
+                  {currentRole === 'ADMIN' && <UserCheck className="w-4 h-4 text-blue-300" />}
+                  {currentRole === 'PARENT' && <Smartphone className="w-4 h-4 text-emerald-300" />}
+                </div>
 
-              <button
-                onClick={() => setCurrentRole('ADMIN')}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  currentRole === 'ADMIN'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                }`}
-                title="Admin / Guru Piket (Laptop/PC)"
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Admin Guru</span>
-              </button>
-
-              <button
-                onClick={() => setCurrentRole('PARENT')}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  currentRole === 'PARENT'
-                    ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                }`}
-                title="User / Orang Tua Siswa (Hp)"
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>Orang Tua (Hp)</span>
-              </button>
-            </div>
+                <div className="text-left hidden sm:block">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
+                      {currentRole === 'SUPER_ADMIN' ? 'Super Admin' : currentRole === 'ADMIN' ? 'Admin / Guru' : 'Wali Murid'}
+                    </span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  </div>
+                  <p className="text-xs font-bold text-slate-200 truncate max-w-[150px] lg:max-w-[200px]">
+                    {currentUser.name}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Logout Button */}
             <button
               onClick={() => logout()}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/60 hover:text-rose-200 text-slate-400 border border-slate-700 transition-colors"
-              title="Keluar / Ganti Akun"
+              className="px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-rose-600 active:scale-95 text-slate-300 hover:text-white border border-slate-700 hover:border-rose-500 transition-all text-xs font-bold flex items-center gap-1.5 shadow-sm"
+              title="Keluar dari akun dan kembali ke halaman Login"
             >
               <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Keluar</span>
             </button>
           </div>
 
