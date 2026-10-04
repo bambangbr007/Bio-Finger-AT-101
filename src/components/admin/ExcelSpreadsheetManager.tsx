@@ -210,7 +210,7 @@ export const ExcelSpreadsheetManager: React.FC = () => {
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    <span>Impor & Kirim Notif WhatsApp</span>
+                    <span>Tarik Data & Kirim Presisi ke Akun Ortu</span>
                   </>
                 )}
               </button>
@@ -224,8 +224,8 @@ export const ExcelSpreadsheetManager: React.FC = () => {
           <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3 text-blue-900 text-xs">
             <RefreshCw className="w-5 h-5 text-blue-600 animate-spin shrink-0" />
             <div>
-              <p className="font-bold">Memproses File Spreadsheet...</p>
-              <p className="text-blue-700">Mencocokkan PIN dengan database 480 siswa dan menyiapkan notifikasi otomatis.</p>
+              <p className="font-bold">Memproses File Spreadsheet & Sinkronisasi Presisi...</p>
+              <p className="text-blue-700">Mencocokkan PIN BioFinger & Nama Anak untuk mengirimkan laporan langsung ke akun aplikasi orang tua siswa.</p>
             </div>
           </div>
         )}
@@ -236,35 +236,35 @@ export const ExcelSpreadsheetManager: React.FC = () => {
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                 <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
-                  Impor Berhasil & Notifikasi Massal Terkirim
+                  Data BIO Finger Berhasil Ditarik & Terkirim Presisi ke Akun Orang Tua
                 </h4>
               </div>
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-200 text-emerald-800">
-                100% Selesai
+                100% Presisi
               </span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-xs">
-                <span className="text-[10px] text-slate-500 font-semibold block">Total Log</span>
+                <span className="text-[10px] text-slate-500 font-semibold block">Total Log Mesin</span>
                 <span className="text-base font-bold text-slate-800">{importStatus.summary.total} Baris</span>
               </div>
               <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-xs">
-                <span className="text-[10px] text-slate-500 font-semibold block">Berhasil Terproses</span>
-                <span className="text-base font-bold text-emerald-700">{importStatus.summary.processed} Siswa</span>
+                <span className="text-[10px] text-slate-500 font-semibold block">Terkirim ke Akun Siswa</span>
+                <span className="text-base font-bold text-emerald-700">{importStatus.summary.processed} Akun</span>
               </div>
               <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-xs">
                 <span className="text-[10px] text-slate-500 font-semibold block">Terdeteksi Terlambat</span>
                 <span className="text-base font-bold text-amber-600">{importStatus.summary.lateCount} Siswa</span>
               </div>
               <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-xs">
-                <span className="text-[10px] text-slate-500 font-semibold block">Notifikasi WhatsApp</span>
-                <span className="text-base font-bold text-emerald-600">{importStatus.summary.processed} Terkirim</span>
+                <span className="text-[10px] text-slate-500 font-semibold block">Sinkronisasi Aplikasi</span>
+                <span className="text-base font-bold text-emerald-600">✓ Real-time</span>
               </div>
             </div>
 
-            <p className="text-[11px] text-emerald-800">
-              ✓ Seluruh data kehadiran telah dimutakhirkan ke dashboard dan pesan WhatsApp dengan rincian waktu kedatangan telah dikirimkan ke nomor wali masing-masing.
+            <p className="text-[11px] text-emerald-800 leading-relaxed">
+              ✓ Seluruh data kehadiran yang ditarik dari mesin BIO Finger AT-101 telah otomatis terkirim secara presisi ke setiap akun aplikasi orang tua siswa berdasarkan Nama Anak dan PIN BioFinger masing-masing.
             </p>
           </div>
         )}

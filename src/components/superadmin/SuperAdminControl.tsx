@@ -3,6 +3,7 @@ import { useAttendance } from '../../context/AttendanceContext';
 import { CloudArchitectureViewer } from './CloudArchitectureViewer';
 import { SupabaseIntegrationManager } from './SupabaseIntegrationManager';
 import { BackendDaemonGenerator } from './BackendDaemonGenerator';
+import { ParentAccountsManager } from '../admin/ParentAccountsManager';
 import { 
   ShieldAlert, 
   Cpu, 
@@ -18,14 +19,15 @@ import {
   Sliders,
   Send,
   Cloud,
-  Zap
+  Zap,
+  Key
 } from 'lucide-react';
 import { DEFAULT_TEMPLATES } from '../../utils/whatsappHelper';
 
 export const SuperAdminControl: React.FC = () => {
-  const { schoolConfig, updateSchoolConfig, resetAllData, students, supabaseConfig } = useAttendance();
+  const { schoolConfig, updateSchoolConfig, resetAllData, students, supabaseConfig, parentAccounts } = useAttendance();
 
-  const [activeTab, setActiveTab] = useState<'config' | 'supabase' | 'daemon' | 'cloud_architecture'>('config');
+  const [activeTab, setActiveTab] = useState<'config' | 'supabase' | 'daemon' | 'cloud_architecture' | 'parent_accounts'>('config');
   const [formData, setFormData] = useState(schoolConfig);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   const [testingPing, setTestingPing] = useState<boolean>(false);
@@ -130,7 +132,23 @@ export const SuperAdminControl: React.FC = () => {
           <Cloud className="w-4 h-4" />
           <span>Arsitektur Cloud GCP & Skema PostgreSQL (DDL)</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('parent_accounts')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'parent_accounts'
+              ? 'bg-amber-600 text-white shadow-sm'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Key className="w-4 h-4 text-amber-500" />
+          <span>Kelola Akun Orang Tua & Pesan ({parentAccounts.length})</span>
+        </button>
       </div>
+
+      {activeTab === 'parent_accounts' && (
+        <ParentAccountsManager />
+      )}
 
       {activeTab === 'daemon' && (
         <BackendDaemonGenerator />

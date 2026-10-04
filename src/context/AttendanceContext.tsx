@@ -11,10 +11,14 @@ import {
   PermissionRequest,
   FingerprintEnrollment,
   AttendanceStatus,
-  SupabaseConfig
+  SupabaseConfig,
+  ParentAccount,
+  SchoolParentMessage,
+  SchoolAnnouncement
 } from '../types';
 import { generate480Students } from '../data/mockStudents';
 import { INITIAL_TEACHERS } from '../data/mockTeachers';
+import { INITIAL_ANNOUNCEMENTS } from '../data/mockAnnouncements';
 import { calculateLateMinutes, ParsedBioFingerRow } from '../utils/bioFingerParser';
 import { DEFAULT_TEMPLATES, formatWhatsAppMessage, generateDirectWhatsAppUrl } from '../utils/whatsappHelper';
 
@@ -39,6 +43,22 @@ interface AttendanceContextType {
   enrollmentLogs: FingerprintEnrollment[];
   supabaseConfig: SupabaseConfig;
   updateSupabaseConfig: (config: Partial<SupabaseConfig>) => void;
+  
+  // Parent accounts & direct messaging
+  parentAccounts: ParentAccount[];
+  registerParentAccount: (data: { parentName: string; studentName: string; whatsappPhone: string; password: string; studentClass?: string; avatarUrl?: string }) => { success: boolean; message: string; account?: ParentAccount };
+  resetParentPassword: (accountId: string, newPassword?: string) => { success: boolean; message: string; newPassword: string };
+  schoolParentMessages: SchoolParentMessage[];
+  sendMessageToParent: (data: { studentId: string; subject: string; content: string; channel: 'APP' | 'WHATSAPP' | 'BOTH' }) => { success: boolean; message: string };
+  sendParentReplyMessage: (studentId: string, content: string) => { success: boolean; message: string };
+  markMessageAsRead: (messageId: string) => void;
+  markAllStudentMessagesAsRead: (studentId: string) => void;
+  
+  // Announcements (Pengumuman Madrasah)
+  announcements: SchoolAnnouncement[];
+  addAnnouncement: (data: Omit<SchoolAnnouncement, 'id' | 'publishedAt'>) => { success: boolean; message: string; announcement?: SchoolAnnouncement };
+  updateAnnouncement: (id: string, data: Partial<Omit<SchoolAnnouncement, 'id'>>) => { success: boolean; message: string };
+  deleteAnnouncement: (id: string) => { success: boolean; message: string };
   
   // Actions
   addStudent: (data: Omit<Student, 'id'>) => { success: boolean; message: string; student?: Student };
@@ -322,6 +342,83 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     ];
   });
 
+  // Data Akun Orang Tua Siswa (Username adalah Nama Anak)
+  const [parentAccounts, setParentAccounts] = useState<ParentAccount[]>(() => {
+    const saved = localStorage.getItem('biofinger_parent_accounts');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    // Seed initial 30 parent accounts from sample students
+    const initialStudents = generate480Students().slice(0, 30);
+    const seeded: ParentAccount[] = initialStudents.map((st) => ({
+      id: `ACC-${st.id}`,
+      parentName: st.parentName,
+      studentName: st.name, // Nama anak = username
+      studentId: st.id,
+      studentClass: st.class,
+      whatsappPhone: st.parentPhone,
+      password: 'wali' + st.pin,
+      registeredAt: '2026-10-01 08:00:00',
+      status: 'ACTIVE'
+    }));
+    return seeded;
+  });
+
+  // Pesan Resmi Madrasah ke Orang Tua (Wajib diawali Assalamualaikum Wr. Wb.)
+  const [schoolParentMessages, setSchoolParentMessages] = useState<SchoolParentMessage[]>(() => {
+    const saved = localStorage.getItem('biofinger_parent_messages');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    const initialStudents = generate480Students().slice(0, 10);
+    const seeded: SchoolParentMessage[] = initialStudents.map(st => ({
+      id: `MSG-INIT-${st.id}`,
+      studentId: st.id,
+      studentName: st.name,
+      parentName: st.parentName,
+      parentPhone: st.parentPhone,
+      senderRole: 'ADMIN',
+      senderName: 'Siti Rahmawati, S.Pd. (Guru Piket)',
+      subject: 'Selamat Datang di Portal Presensi MTs Nurus Salam',
+      content: `Assalamualaikum Wr. Wb.\n\nYth. Bapak/Ibu ${st.parentName}, Wali dari ananda ${st.name} (${st.class}).\n\nSelamat datang di Portal Presensi Biometrik BIO Finger AT-101 MTs Nurus Salam Gebog Kudus. Melalui aplikasi ini, Bapak/Ibu dapat memantau kehadiran ananda secara langsung dan mengajukan surat izin sakit online kapan saja.\n\nSemoga ananda senantiasa istiqomah dan berprestasi.\n\nWassalamualaikum Wr. Wb.\nMTs Nurus Salam Gebog Kudus`,
+      sentAt: `${getTodayStr()} 06:30:00`,
+      read: false,
+      channel: 'APP'
+    }));
+    return seeded;
+  });
+
+  // Save to localStorage when state changes
+  useEffect(() => {
+    localStorage.setItem('biofinger_parent_accounts', JSON.stringify(parentAccounts));
+  }, [parentAccounts]);
+
+  useEffect(() => {
+    localStorage.setItem('biofinger_parent_messages', JSON.stringify(schoolParentMessages));
+  }, [schoolParentMessages]);
+
+  // Pengumuman Madrasah untuk Seluruh Akun (Admin edit/kirim, Orang Tua hanya membaca)
+  const [announcements, setAnnouncements] = useState<SchoolAnnouncement[]>(() => {
+    const saved = localStorage.getItem('biofinger_announcements_v1');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return INITIAL_ANNOUNCEMENTS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('biofinger_announcements_v1', JSON.stringify(announcements));
+  }, [announcements]);
+
   // Save to localStorage when state changes
   useEffect(() => {
     localStorage.setItem('biofinger_attendance_v1', JSON.stringify(attendanceRecords));
@@ -405,7 +502,65 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return true;
     }
 
-    // Check if student / parent PIN, NISN, phone, or studentId
+    // 1. Cek akun orang tua terdaftar dengan Username = Nama Anak, Nomor HP, atau ID Siswa
+    const matchedAccount = parentAccounts.find(acc => 
+      acc.studentName.toLowerCase() === cleanId || 
+      acc.studentId.toLowerCase() === cleanId || 
+      acc.whatsappPhone.includes(cleanId)
+    );
+
+    if (matchedAccount) {
+      if (password && matchedAccount.password && matchedAccount.password !== password) {
+        return false;
+      }
+      const st = students.find(s => s.id === matchedAccount.studentId) || {
+        id: matchedAccount.studentId,
+        pin: '1001',
+        nisn: '0012345678',
+        name: matchedAccount.studentName,
+        class: matchedAccount.studentClass,
+        gender: 'L' as const,
+        parentName: matchedAccount.parentName,
+        parentPhone: matchedAccount.whatsappPhone,
+        parentEmail: `${matchedAccount.studentName.toLowerCase().replace(/\s+/g, '')}@wali.sekolah.id`,
+        avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${matchedAccount.studentName}`,
+        fingerprintRegistered: true
+      };
+
+      const user: AuthUser = {
+        id: `USR-PARENT-${st.id}`,
+        role: 'PARENT',
+        name: `${matchedAccount.parentName} (Wali dari ${matchedAccount.studentName})`,
+        usernameOrEmail: matchedAccount.studentName,
+        studentId: st.id
+      };
+      setCurrentUser(user);
+      setCurrentRole('PARENT');
+      setSelectedParentStudentId(st.id);
+      return true;
+    }
+
+    // 2. Cek apakah cocok dengan nama siswa langsung
+    const matchedStudentByName = students.find(s => s.name.toLowerCase() === cleanId);
+    if (matchedStudentByName) {
+      const existingAcc = parentAccounts.find(a => a.studentId === matchedStudentByName.id);
+      if (existingAcc && password && existingAcc.password !== password) {
+        return false;
+      }
+      const user: AuthUser = {
+        id: `USR-PARENT-${matchedStudentByName.id}`,
+        role: 'PARENT',
+        name: `${matchedStudentByName.parentName} (Wali dari ${matchedStudentByName.name})`,
+        usernameOrEmail: matchedStudentByName.name,
+        studentId: matchedStudentByName.id
+      };
+      setCurrentUser(user);
+      setCurrentRole('PARENT');
+      setSelectedParentStudentId(matchedStudentByName.id);
+      return true;
+    }
+
+    // 3. Fallback: Cek PIN BioFinger, NISN, No HP, atau ID Siswa
     const targetStudentId = studentIdOverride;
     const matchedStudent = targetStudentId 
       ? students.find(s => s.id === targetStudentId)
@@ -422,7 +577,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         id: `USR-PARENT-${st.id}`,
         role: 'PARENT',
         name: `${st.parentName} (Wali dari ${st.name})`,
-        usernameOrEmail: st.parentEmail,
+        usernameOrEmail: st.name,
         studentId: st.id
       };
       setCurrentUser(user);
@@ -438,6 +593,255 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCurrentUser(null);
     sessionStorage.removeItem('biofinger_auth_user');
     localStorage.removeItem('biofinger_auth_user');
+  };
+
+  // Registrasi Akun Baru Orang Tua (Nama Anak = Username)
+  const registerParentAccount = (data: {
+    parentName: string;
+    studentName: string;
+    whatsappPhone: string;
+    password: string;
+    studentClass?: string;
+    avatarUrl?: string;
+  }): { success: boolean; message: string; account?: ParentAccount } => {
+    const cleanStudentName = data.studentName.trim();
+    const cleanParentName = data.parentName.trim();
+    const cleanPhone = data.whatsappPhone.trim().replace(/[^0-9]/g, '');
+    const cleanClass = data.studentClass?.trim() || 'Kelas 7A';
+
+    const formattedPhone = cleanPhone.startsWith('62') 
+      ? cleanPhone 
+      : cleanPhone.startsWith('0') 
+      ? '62' + cleanPhone.slice(1) 
+      : '62' + cleanPhone;
+
+    // Cek apakah akun untuk siswa ini sudah pernah didaftarkan
+    const existing = parentAccounts.find(
+      acc => acc.studentName.toLowerCase() === cleanStudentName.toLowerCase()
+    );
+    if (existing) {
+      return { 
+        success: false, 
+        message: `Akun untuk siswa "${cleanStudentName}" sudah terdaftar. Silakan login atau hubungi admin jika lupa password.` 
+      };
+    }
+
+    const studentAvatar = data.avatarUrl && data.avatarUrl.trim() 
+      ? data.avatarUrl.trim() 
+      : `https://api.dicebear.com/7.x/bottts/svg?seed=${cleanStudentName}`;
+
+    // Cek atau buatkan data siswa
+    let matchedStudent = students.find(
+      s => s.name.toLowerCase() === cleanStudentName.toLowerCase()
+    );
+
+    if (!matchedStudent) {
+      const nextId = `STU-${String(students.length + 1).padStart(3, '0')}`;
+      const nextPin = String(1000 + students.length + 1);
+      const newStudent: Student = {
+        id: nextId,
+        pin: nextPin,
+        nisn: `00${Math.floor(10000000 + Math.random() * 90000000)}`,
+        name: cleanStudentName,
+        class: cleanClass,
+        gender: 'L',
+        parentName: cleanParentName,
+        parentPhone: formattedPhone,
+        parentEmail: `${cleanStudentName.toLowerCase().replace(/\s+/g, '')}@wali.sekolah.id`,
+        avatarUrl: studentAvatar,
+        fingerprintRegistered: true
+      };
+      setStudents(prev => [newStudent, ...prev]);
+      matchedStudent = newStudent;
+    } else if (data.avatarUrl) {
+      setStudents(prev => prev.map(s => s.id === matchedStudent!.id ? { ...s, avatarUrl: studentAvatar } : s));
+      matchedStudent = { ...matchedStudent, avatarUrl: studentAvatar };
+    }
+
+    const newAccount: ParentAccount = {
+      id: `ACC-PARENT-${Date.now()}`,
+      parentName: cleanParentName,
+      studentName: matchedStudent.name,
+      studentId: matchedStudent.id,
+      studentClass: matchedStudent.class,
+      whatsappPhone: formattedPhone,
+      password: data.password.trim(),
+      registeredAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      status: 'ACTIVE'
+    };
+
+    setParentAccounts(prev => [newAccount, ...prev]);
+
+    // Kirim pesan selamat datang resmi diawali Assalamualaikum
+    const welcomeMsg: SchoolParentMessage = {
+      id: `MSG-WELCOME-${Date.now()}`,
+      studentId: matchedStudent.id,
+      studentName: matchedStudent.name,
+      parentName: cleanParentName,
+      parentPhone: formattedPhone,
+      senderRole: 'ADMIN',
+      senderName: 'Tata Usaha MTs Nurus Salam',
+      subject: 'Pendaftaran Akun Wali Murid Berhasil',
+      content: `Assalamualaikum Wr. Wb.\n\nYth. Bapak/Ibu ${cleanParentName}, Wali dari ananda ${matchedStudent.name} (${matchedStudent.class}).\n\nAlhamdulillah pendaftaran akun wali murid di MTs Nurus Salam Gebog Kudus telah berhasil. Akun Anda telah aktif dengan rincian login:\n- Username: ${matchedStudent.name}\n- Password: [Sesuai yang Bapak/Ibu buat]\n\nMelalui aplikasi ini, Bapak/Ibu dapat memantau presensi ananda secara langsung dan mengajukan izin/sakit online kapan saja.\n\nWassalamualaikum Wr. Wb.\nMTs Nurus Salam Gebog Kudus`,
+      sentAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      read: false,
+      channel: 'BOTH'
+    };
+    setSchoolParentMessages(prev => [welcomeMsg, ...prev]);
+
+    return {
+      success: true,
+      message: `Pendaftaran berhasil! Akun untuk wali dari ananda ${matchedStudent.name} telah aktif.`,
+      account: newAccount
+    };
+  };
+
+  // Reset Password Akun Orang Tua oleh Admin / Super Admin
+  const resetParentPassword = (accountId: string, newPassword?: string): { success: boolean; message: string; newPassword: string } => {
+    const acc = parentAccounts.find(a => a.id === accountId);
+    if (!acc) return { success: false, message: 'Akun wali murid tidak ditemukan.', newPassword: '' };
+
+    const genPassword = newPassword && newPassword.trim() ? newPassword.trim() : `mts${Math.floor(100000 + Math.random() * 900000)}`;
+
+    setParentAccounts(prev => prev.map(a => {
+      if (a.id === accountId) {
+        return {
+          ...a,
+          password: genPassword,
+          lastResetAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+          resetBy: currentRole
+        };
+      }
+      return a;
+    }));
+
+    // Kirim pesan notifikasi reset password santun diawali Assalamualaikum
+    const resetMsg: SchoolParentMessage = {
+      id: `MSG-RESET-${Date.now()}`,
+      studentId: acc.studentId,
+      studentName: acc.studentName,
+      parentName: acc.parentName,
+      parentPhone: acc.whatsappPhone,
+      senderRole: currentRole === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'ADMIN',
+      senderName: currentRole === 'SUPER_ADMIN' ? 'Kepala Sekolah MTs Nurus Salam' : 'Guru Piket MTs Nurus Salam',
+      subject: 'Pemberitahuan Reset Password Akun Aplikasi',
+      content: `Assalamualaikum Wr. Wb.\n\nYth. Bapak/Ibu ${acc.parentName}, Wali dari ananda ${acc.studentName} (${acc.studentClass}).\n\nMenindaklanjuti permohonan reset password, akun aplikasi presensi ananda di MTs Nurus Salam Gebog Kudus telah berhasil direset oleh pihak sekolah dengan informasi sebagai berikut:\n\n- Username: ${acc.studentName}\n- Password Baru: ${genPassword}\n\nSilakan gunakan kredensial tersebut untuk login kembali ke aplikasi. Demi keamanan, simpanlah password ini dengan baik.\n\nWassalamualaikum Wr. Wb.\nMTs Nurus Salam Gebog Kudus`,
+      sentAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      read: false,
+      channel: 'BOTH'
+    };
+    setSchoolParentMessages(prev => [resetMsg, ...prev]);
+
+    return {
+      success: true,
+      message: `Password akun ${acc.studentName} berhasil direset menjadi: ${genPassword}`,
+      newPassword: genPassword
+    };
+  };
+
+  // Kirim Pesan Resmi Madrasah ke Orang Tua (Wajib diawali Assalamualaikum Wr. Wb.)
+  const sendMessageToParent = (data: {
+    studentId: string;
+    subject: string;
+    content: string;
+    channel: 'APP' | 'WHATSAPP' | 'BOTH';
+  }): { success: boolean; message: string } => {
+    const student = students.find(s => s.id === data.studentId);
+    if (!student) return { success: false, message: 'Data siswa tidak ditemukan.' };
+
+    // Pastikan seluruh pesan diawali dengan Assalamualaikum Wr. Wb.
+    let finalContent = data.content.trim();
+    if (!finalContent.toLowerCase().startsWith('assalamualaikum')) {
+      finalContent = `Assalamualaikum Wr. Wb.\n\n${finalContent}`;
+    }
+
+    const newMsg: SchoolParentMessage = {
+      id: `MSG-${Date.now()}`,
+      studentId: student.id,
+      studentName: student.name,
+      parentName: student.parentName,
+      parentPhone: student.parentPhone,
+      senderRole: currentRole === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'ADMIN',
+      senderName: currentUser?.name || (currentRole === 'SUPER_ADMIN' ? 'Kepala Sekolah MTs Nurus Salam' : 'Guru Piket MTs Nurus Salam'),
+      subject: data.subject.trim(),
+      content: finalContent,
+      sentAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      read: false,
+      channel: data.channel
+    };
+
+    setSchoolParentMessages(prev => [newMsg, ...prev]);
+
+    return {
+      success: true,
+      message: `Pesan resmi berhasil dikirimkan ke akun wali murid ${student.name}.`
+    };
+  };
+
+  // Balasan Interaktif Real-Time dari Orang Tua ke Admin / Guru Piket
+  const sendParentReplyMessage = (studentId: string, content: string): { success: boolean; message: string } => {
+    const student = students.find(s => s.id === studentId);
+    if (!student) return { success: false, message: 'Data siswa tidak ditemukan.' };
+
+    let cleanContent = content.trim();
+    if (!cleanContent.toLowerCase().startsWith('assalamualaikum') && !cleanContent.toLowerCase().startsWith('waalaikumsalam')) {
+      cleanContent = `Assalamualaikum Wr. Wb.\n\n${cleanContent}`;
+    }
+
+    const parentMsg: SchoolParentMessage = {
+      id: `MSG-PARENT-${Date.now()}`,
+      studentId: student.id,
+      studentName: student.name,
+      parentName: student.parentName,
+      parentPhone: student.parentPhone,
+      senderRole: 'PARENT',
+      senderName: `${student.parentName} (Wali Murid)`,
+      subject: 'Balasan Pesan dari Orang Tua',
+      content: cleanContent,
+      sentAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      read: true,
+      channel: 'APP'
+    };
+
+    setSchoolParentMessages(prev => [...prev, parentMsg]);
+
+    return {
+      success: true,
+      message: 'Pesan berhasil terkirim ke Guru Piket MTs Nurus Salam.'
+    };
+  };
+
+  const markMessageAsRead = (messageId: string) => {
+    setSchoolParentMessages(prev => prev.map(m => m.id === messageId ? { ...m, read: true } : m));
+  };
+
+  const markAllStudentMessagesAsRead = (studentId: string) => {
+    setSchoolParentMessages(prev => prev.map(m => m.studentId === studentId ? { ...m, read: true } : m));
+  };
+
+  // Announcements CRUD (Admin bisa membuat, mengedit, & menghapus)
+  const addAnnouncement = (data: Omit<SchoolAnnouncement, 'id' | 'publishedAt'>) => {
+    const newAnn: SchoolAnnouncement = {
+      ...data,
+      id: `ANN-${Date.now()}`,
+      publishedAt: new Date().toISOString().replace('T', ' ').substring(0, 19)
+    };
+    setAnnouncements(prev => [newAnn, ...prev]);
+    return { 
+      success: true, 
+      message: 'Pengumuman resmi madrasah berhasil diterbitkan ke seluruh akun!', 
+      announcement: newAnn 
+    };
+  };
+
+  const updateAnnouncement = (id: string, data: Partial<Omit<SchoolAnnouncement, 'id'>>) => {
+    setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, ...data } : a));
+    return { success: true, message: 'Pengumuman berhasil diperbarui!' };
+  };
+
+  const deleteAnnouncement = (id: string) => {
+    setAnnouncements(prev => prev.filter(a => a.id !== id));
+    return { success: true, message: 'Pengumuman berhasil dihapus.' };
   };
 
   // Student CRUD: Add & Delete
@@ -720,9 +1124,27 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     setNotificationLogs(prev => [newNotifLog, emailNotifLog, ...prev.slice(0, 298)]);
 
+    // Kirim notifikasi pesan resmi ke akun aplikasi orang tua siswa secara presisi berdasarkan Nama Anak & PIN BioFinger
+    const parentAttMsg: SchoolParentMessage = {
+      id: `MSG-ATT-${Date.now()}-${student.id}`,
+      studentId: student.id,
+      studentName: student.name,
+      parentName: student.parentName,
+      parentPhone: student.parentPhone,
+      senderRole: 'ADMIN',
+      senderName: 'Sistem BIO Finger AT-101 MTs Nurus Salam',
+      subject: `Notifikasi Presensi ${isCheckIn ? 'Masuk' : 'Pulang'} - ${student.name}`,
+      content: `Assalamualaikum Wr. Wb.\n\nYth. Bapak/Ibu ${student.parentName}, Wali dari ananda ${student.name} (${student.class}).\n\nAlhamdulillah, ananda telah berhasil terdeteksi melakukan scan sidik jari pada mesin BIO Finger AT-101 MTs Nurus Salam Gebog Kudus:\n\n- Nama Anak: ${student.name}\n- PIN BioFinger: ${student.pin}\n- Waktu Scan: ${timeNowStr} WIB\n- Status: ${notifStatusText}\n- Tanggal: ${dateToday}\n\nNotifikasi ini terkirim secara presisi langsung ke akun aplikasi ini.\n\nWassalamualaikum Wr. Wb.\nMTs Nurus Salam Gebog Kudus`,
+      sentAt: `${dateToday} ${timeNowStr}`,
+      read: false,
+      channel: 'BOTH'
+    };
+
+    setSchoolParentMessages(prev => [parentAttMsg, ...prev]);
+
     return {
       success: true,
-      message: `${student.name} (${student.class}) berhasil presensi ${isCheckIn ? 'MASUK' : 'PULANG'}. Notifikasi terkirim ke WhatsApp ${student.parentPhone}!`,
+      message: `${student.name} (${student.class}) berhasil presensi ${isCheckIn ? 'MASUK' : 'PULANG'}. Laporan langsung tersinkronisasi presisi ke akun orang tua & WhatsApp ${student.parentPhone}!`,
       record: updatedRecord
     };
   };
@@ -893,7 +1315,19 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         resendNotification,
         resetAllData,
         supabaseConfig,
-        updateSupabaseConfig
+        updateSupabaseConfig,
+        parentAccounts,
+        registerParentAccount,
+        resetParentPassword,
+        schoolParentMessages,
+        sendMessageToParent,
+        sendParentReplyMessage,
+        markMessageAsRead,
+        markAllStudentMessagesAsRead,
+        announcements,
+        addAnnouncement,
+        updateAnnouncement,
+        deleteAnnouncement
       }}
     >
       {children}

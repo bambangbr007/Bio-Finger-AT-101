@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAttendance } from '../../context/AttendanceContext';
 import { 
   Fingerprint, 
@@ -20,7 +20,9 @@ import {
   Smartphone,
   LogOut,
   Paperclip,
-  Upload
+  Upload,
+  Bell,
+  Pin
 } from 'lucide-react';
 import { generateDirectWhatsAppUrl } from '../../utils/whatsappHelper';
 
@@ -35,10 +37,16 @@ export const ParentMobileView: React.FC = () => {
     permissions,
     submitPermission,
     currentUser,
-    logout
+    logout,
+    schoolParentMessages,
+    markMessageAsRead,
+    markAllStudentMessagesAsRead,
+    sendParentReplyMessage,
+    announcements
   } = useAttendance();
 
-  const [activeTab, setActiveTab] = useState<'home' | 'history' | 'permission' | 'profile'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'history' | 'permission' | 'announcements' | 'messages' | 'profile'>('home');
+  const [annCategoryFilter, setAnnCategoryFilter] = useState<string>('ALL');
 
   // Form state for leave/sick submission
   const [permType, setPermType] = useState<'SAKIT' | 'IZIN'>('SAKIT');
@@ -46,6 +54,10 @@ export const ParentMobileView: React.FC = () => {
   const [permNote, setPermNote] = useState<string>('');
   const [attachmentFileName, setAttachmentFileName] = useState<string>('');
   const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
+
+  // State for interactive live chat
+  const [parentChatInput, setParentChatInput] = useState<string>('');
+  const [chatSuccessFlash, setChatSuccessFlash] = useState<boolean>(false);
 
   // Kunci data secara ketat hanya untuk anak dari wali murid yang login
   const currentStudent = (currentUser?.studentId ? students.find(s => s.id === currentUser.studentId) : null)
@@ -55,6 +67,63 @@ export const ParentMobileView: React.FC = () => {
   const todayRecord = attendanceRecords.find(r => r.studentId === currentStudent.id && r.date === activeDate);
   const studentPermissions = permissions.filter(p => p.studentId === currentStudent.id);
   const studentNotifs = notificationLogs.filter(n => n.studentId === currentStudent.id);
+  const studentMessages = schoolParentMessages.filter(m => m.studentId === currentStudent.id);
+  const unreadMessagesCount = studentMessages.filter(m => !m.read && m.senderRole !== 'PARENT').length;
+
+  // Filter pengumuman resmi madrasah untuk anak / kelas ini
+  const relevantAnnouncements = useMemo(() => {
+    return announcements
+      .filter(a => a.targetClass === 'SEMUA' || a.targetClass === currentStudent.class)
+      .sort((a, b) => {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+      });
+  }, [announcements, currentStudent.class]);
+
+  // Riwayat ID pengumuman yang sudah dibaca oleh wali murid (tersimpan per anak)
+  const [readAnnouncementIds, setReadAnnouncementIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(`biofinger_read_ann_${currentStudent.id}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  // Hitung jumlah pengumuman yang belum dibaca
+  const unreadAnnouncementsCount = useMemo(() => {
+    return relevantAnnouncements.filter(a => !readAnnouncementIds.includes(a.id)).length;
+  }, [relevantAnnouncements, readAnnouncementIds]);
+
+  // Hilangkan nomor notifikasi saat orang tua membuka tab Pengumuman (otomatis ditandai sudah dibaca)
+  useEffect(() => {
+    if (activeTab === 'announcements' && unreadAnnouncementsCount > 0) {
+      const allIds = relevantAnnouncements.map(a => a.id);
+      const updated = Array.from(new Set([...readAnnouncementIds, ...allIds]));
+      setReadAnnouncementIds(updated);
+      try {
+        localStorage.setItem(`biofinger_read_ann_${currentStudent.id}`, JSON.stringify(updated));
+      } catch (e) {}
+    }
+  }, [activeTab, unreadAnnouncementsCount, relevantAnnouncements, readAnnouncementIds, currentStudent.id]);
+
+  // Fungsi manual untuk menandai semua pengumuman sudah dibaca
+  const markAllAnnouncementsAsRead = () => {
+    const allIds = relevantAnnouncements.map(a => a.id);
+    const updated = Array.from(new Set([...readAnnouncementIds, ...allIds]));
+    setReadAnnouncementIds(updated);
+    try {
+      localStorage.setItem(`biofinger_read_ann_${currentStudent.id}`, JSON.stringify(updated));
+    } catch (e) {}
+  };
+
+  // Hilangkan tanda notifikasi saat orang tua membuka tab pesan
+  useEffect(() => {
+    if (activeTab === 'messages' && unreadMessagesCount > 0) {
+      markAllStudentMessagesAsRead(currentStudent.id);
+    }
+  }, [activeTab, unreadMessagesCount, currentStudent.id, markAllStudentMessagesAsRead]);
 
   const handleLeaveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +134,16 @@ export const ParentMobileView: React.FC = () => {
     setPermNote('');
     setAttachmentFileName('');
     setTimeout(() => setSubmitSuccess(false), 4500);
+  };
+
+  const handleSendChat = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!parentChatInput.trim()) return;
+
+    sendParentReplyMessage(currentStudent.id, parentChatInput);
+    setParentChatInput('');
+    setChatSuccessFlash(true);
+    setTimeout(() => setChatSuccessFlash(false), 2500);
   };
 
   const getStatusBadge = () => {
@@ -184,16 +263,6 @@ export const ParentMobileView: React.FC = () => {
               </div>
             </div>
           </div>
-
-          {/* Tombol Keluar di bar sebelah profil */}
-          <button
-            onClick={() => logout()}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/15 hover:bg-rose-600 active:scale-95 text-white border border-white/25 hover:border-rose-400 text-xs font-bold transition-all shadow-sm shrink-0"
-            title="Keluar dari akun aplikasi"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Keluar</span>
-          </button>
         </div>
       </div>
 
@@ -203,6 +272,57 @@ export const ParentMobileView: React.FC = () => {
         {/* TAB 1: BERANDA */}
         {activeTab === 'home' && (
           <>
+            {/* Banner Notifikasi Pesan Baru dari Madrasah (jika ada) */}
+            {unreadMessagesCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('messages')}
+                className="w-full p-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 text-white flex items-center justify-between text-xs hover:from-blue-700 hover:to-indigo-800 transition-all text-left shadow-md shadow-blue-500/20"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+                    <MessageSquare className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <span className="font-bold block text-xs">Ada {unreadMessagesCount} Pesan Baru dari Madrasah!</span>
+                    <span className="text-[11px] text-blue-100">Klik di sini untuk membaca pesan resmi sekolah</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-blue-200 shrink-0" />
+              </button>
+            )}
+
+            {/* Banner Pengumuman Resmi Madrasah */}
+            {relevantAnnouncements.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('announcements')}
+                className="w-full p-3 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white flex items-center justify-between text-xs hover:from-amber-600 hover:to-orange-700 transition-all text-left shadow-md shadow-amber-500/20"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+                    <Bell className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-1.5 py-0.2 rounded">
+                        Pengumuman Madrasah
+                      </span>
+                      {relevantAnnouncements[0].priority === 'PENTING' && (
+                        <span className="text-[9px] font-bold bg-rose-600 text-white px-1.5 py-0.2 rounded animate-pulse">
+                          PENTING
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-bold block text-xs truncate mt-0.5">
+                      {relevantAnnouncements[0].title}
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-amber-100 shrink-0 ml-1" />
+              </button>
+            )}
+
             {/* Live Attendance Status Today */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
               <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-100">
@@ -307,7 +427,7 @@ export const ParentMobileView: React.FC = () => {
                   </div>
                 ) : (
                   <p className="text-slate-500 italic">
-                    Notifikasi kehadiran ananda akan otomatis terkirim secara real-time ke nomor WhatsApp Bapak/Ibu setelah ananda melakukan scan sidik jari pada mesin BIO Finger AT-101 MTs Nurus Salam Gebog Kudus.
+                    Notifikasi kehadiran ananda akan otomatis terkirim secara real-time di aplikasi ini setelah ananda melakukan scan sidik jari pada mesin BIO Finger AT-101 MTs Nurus Salam Gebog Kudus.
                   </p>
                 )}
               </div>
@@ -593,7 +713,279 @@ export const ParentMobileView: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 4: PROFIL & MESIN AT-101 */}
+        {/* TAB 4: PENGUMUMAN RESMI MADRASAH (HANYA MENERIMA / MEMBACA) */}
+        {activeTab === 'announcements' && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-3.5">
+            <div className="border-b border-slate-100 pb-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                  Papan Pengumuman Resmi
+                </span>
+                <span className="text-[10px] text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded-md">
+                  Status: Penerima (Wali Murid)
+                </span>
+              </div>
+              <h3 className="text-sm font-bold text-slate-900 mt-1">Pengumuman MTs Nurus Salam</h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Informasi dan surat edaran resmi madrasah untuk wali dari ananda <strong>{currentStudent.name}</strong> ({currentStudent.class}).
+              </p>
+            </div>
+
+            {/* Filter Category Chips */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
+              {[
+                { id: 'ALL', label: 'Semua' },
+                { id: 'UJIAN', label: 'Ujian / PTS' },
+                { id: 'LIBUR', label: 'Libur' },
+                { id: 'RAPAT', label: 'Rapat Ortu' },
+                { id: 'PHBI', label: 'Hari Besar Islam' },
+                { id: 'UMUM', label: 'Umum' }
+              ].map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setAnnCategoryFilter(cat.id)}
+                  className={`px-2.5 py-1 rounded-full shrink-0 font-bold transition-all border ${
+                    annCategoryFilter === cat.id
+                      ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-2xs'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Announcements Feed */}
+            {relevantAnnouncements.length === 0 ? (
+              <div className="py-10 text-center text-slate-400 space-y-2">
+                <Bell className="w-10 h-10 mx-auto text-slate-300 stroke-[1.5]" />
+                <p className="text-xs font-semibold text-slate-600">Belum ada pengumuman terbaru.</p>
+                <p className="text-[11px] text-slate-400">Pengumuman penting madrasah akan muncul di halaman ini.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {relevantAnnouncements
+                  .filter(a => annCategoryFilter === 'ALL' || a.category === annCategoryFilter)
+                  .map(ann => {
+                    const isPTS = ann.category === 'UJIAN';
+                    const isLibur = ann.category === 'LIBUR';
+                    const isRapat = ann.category === 'RAPAT';
+                    const isPHBI = ann.category === 'PHBI';
+                    return (
+                      <div
+                        key={ann.id}
+                        className={`rounded-2xl border p-4 space-y-2.5 text-xs transition-all shadow-xs ${
+                          ann.pinned 
+                            ? 'bg-gradient-to-br from-amber-50/70 via-white to-amber-50/30 border-amber-300' 
+                            : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {ann.pinned && (
+                              <span className="text-[9px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 px-1.5 py-0.2 rounded flex items-center gap-0.5">
+                                <Pin className="w-2.5 h-2.5 fill-slate-950" />
+                                Disematkan
+                              </span>
+                            )}
+                            <span className={`text-[9px] font-extrabold px-2 py-0.2 rounded-full border ${
+                              isPTS ? 'bg-rose-50 text-rose-800 border-rose-200' :
+                              isLibur ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                              isRapat ? 'bg-purple-50 text-purple-800 border-purple-200' :
+                              isPHBI ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                              'bg-blue-50 text-blue-800 border-blue-200'
+                            }`}>
+                              {ann.category === 'UJIAN' ? 'Ujian / Asesmen' :
+                               ann.category === 'LIBUR' ? 'Libur Madrasah' :
+                               ann.category === 'RAPAT' ? 'Rapat Wali Murid' :
+                               ann.category === 'PHBI' ? 'Hari Besar Islam' : 'Informasi Umum'}
+                            </span>
+
+                            {ann.priority === 'PENTING' && (
+                              <span className="text-[9px] font-black bg-rose-500 text-white px-1.5 py-0.2 rounded animate-pulse">
+                                PENTING
+                              </span>
+                            )}
+                          </div>
+
+                          <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                            {ann.publishedAt.slice(0, 10)}
+                          </span>
+                        </div>
+
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-xs sm:text-sm leading-snug">
+                            {ann.title}
+                          </h4>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            Oleh: <strong className="text-slate-700">{ann.authorName}</strong> ({ann.authorRole})
+                          </p>
+                        </div>
+
+                        <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-100 text-slate-700 font-sans leading-relaxed whitespace-pre-line text-xs">
+                          {ann.content}
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400">
+                          <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Surat Resmi MTs Nurus Salam</span>
+                          </span>
+                          <span className="italic">
+                            Hanya Membaca
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 5: KOTAK PESAN RESMI MADRASAH (INTERAKTIF DUA ARAH REAL-TIME) */}
+        {activeTab === 'messages' && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-3.5">
+            <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  Layanan Chat Langsung MTs Nurus Salam
+                </span>
+                <h3 className="text-sm font-bold text-slate-900 mt-1">Percakapan Resmi dengan Guru Piket</h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Wali dari ananda <strong>{currentStudent.name}</strong> ({currentStudent.class})
+                </p>
+              </div>
+
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Piket Aktif</span>
+              </div>
+            </div>
+
+            {/* Conversation Stream */}
+            <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+              {studentMessages.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 space-y-2">
+                  <MessageSquare className="w-10 h-10 mx-auto text-slate-300 stroke-[1.5]" />
+                  <p className="text-xs font-semibold text-slate-600">Belum ada percakapan.</p>
+                  <p className="text-[11px] text-slate-400">Silakan ketik pesan di bawah untuk menghubungi Guru Piket secara langsung.</p>
+                </div>
+              ) : (
+                studentMessages.map((msg) => {
+                  const isParent = msg.senderRole === 'PARENT';
+                  return (
+                    <div 
+                      key={msg.id} 
+                      className={`flex flex-col ${isParent ? 'items-end' : 'items-start'} space-y-1`}
+                    >
+                      <div 
+                        className={`max-w-[88%] p-3 rounded-2xl text-xs space-y-1.5 shadow-xs ${
+                          isParent 
+                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-tr-xs' 
+                            : 'bg-slate-50 border border-slate-200/90 text-slate-800 rounded-tl-xs'
+                        }`}
+                      >
+                        <div className={`flex items-center justify-between gap-2 border-b pb-1 text-[10px] ${
+                          isParent ? 'border-white/20 text-blue-100' : 'border-slate-200 text-slate-500'
+                        }`}>
+                          <span className="font-bold">
+                            {isParent ? 'Anda (Wali Murid)' : msg.senderName}
+                          </span>
+                          <span className="font-mono text-[9px] opacity-80">
+                            {msg.sentAt.slice(11, 16)} WIB
+                          </span>
+                        </div>
+
+                        {msg.subject && !isParent && (
+                          <div className="font-bold text-[11px] text-slate-900">
+                            {msg.subject}
+                          </div>
+                        )}
+
+                        <p className={`leading-relaxed whitespace-pre-line ${isParent ? 'text-white' : 'text-slate-700'}`}>
+                          {msg.content}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Interactive Reply Input Bar */}
+            <form onSubmit={handleSendChat} className="space-y-2 pt-3 border-t border-slate-100">
+              {/* Quick Greeting Chips */}
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => setParentChatInput('Assalamualaikum Wr. Wb. Mohon informasi kehadiran ananda hari ini nggih.')}
+                  className="px-2 py-0.5 rounded-full bg-slate-100 hover:bg-blue-50 text-[10px] text-slate-600 hover:text-blue-700 border border-slate-200 transition-all"
+                >
+                  Tanya Presensi
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setParentChatInput('Assalamualaikum Wr. Wb. Hari ini ananda berhalangan hadir karena kurang sehat.')}
+                  className="px-2 py-0.5 rounded-full bg-slate-100 hover:bg-amber-50 text-[10px] text-slate-600 hover:text-amber-700 border border-slate-200 transition-all"
+                >
+                  Kabar Izin / Sakit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setParentChatInput('Waalaikumsalam Wr. Wb. Terima kasih banyak atas informasinya nggih Bu/Pak Guru.')}
+                  className="px-2 py-0.5 rounded-full bg-slate-100 hover:bg-emerald-50 text-[10px] text-slate-600 hover:text-emerald-700 border border-slate-200 transition-all"
+                >
+                  Terima Kasih
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={parentChatInput}
+                  onChange={(e) => setParentChatInput(e.target.value)}
+                  placeholder="Ketik balasan pesan untuk Guru Piket di sini..."
+                  className="flex-1 p-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs bg-slate-50 focus:bg-white"
+                />
+                <button
+                  type="submit"
+                  disabled={!parentChatInput.trim()}
+                  className="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-bold transition-all shadow-md shadow-blue-500/20 shrink-0 flex items-center justify-center"
+                  title="Kirim pesan balasan"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+
+              {chatSuccessFlash && (
+                <div className="text-[10px] text-emerald-700 font-bold flex items-center gap-1.5 animate-fade-in bg-emerald-50 p-2 rounded-xl border border-emerald-200">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Pesan terkirim ke Guru Piket! Menunggu balasan manual dari Admin / Guru Piket.</span>
+                </div>
+              )}
+            </form>
+
+            {/* Quick WhatsApp fallback button */}
+            <div className="pt-1 text-center">
+              <a
+                href={generateDirectWhatsAppUrl(
+                  currentStudent.parentPhone,
+                  `*MTs Nurus Salam Gebog Kudus*\nAssalamualaikum Wr. Wb. Saya orang tua dari ${currentStudent.name} (${currentStudent.class}). Ingin menanyakan...`
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-emerald-700 hover:text-emerald-900 font-semibold inline-flex items-center gap-1"
+              >
+                <span>Atau hubungi via WhatsApp Resmi Madrasah</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 5: PROFIL & MESIN AT-101 */}
         {activeTab === 'profile' && (
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-4">
             <div className="text-center pb-3 border-b border-slate-100">
@@ -672,12 +1064,46 @@ export const ParentMobileView: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('permission')}
-          className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition-all ${
             activeTab === 'permission' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600'
           }`}
         >
           <FileText className="w-5 h-5" />
-          <span className="text-[10px]">Izin / Sakit</span>
+          <span className="text-[10px]">Izin</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('announcements')}
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition-all relative ${
+            activeTab === 'announcements' ? 'text-amber-600 font-bold' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <div className="relative">
+            <Bell className="w-5 h-5" />
+            {unreadAnnouncementsCount > 0 && (
+              <span className="absolute -top-1 -right-2 w-4 h-4 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black flex items-center justify-center shadow-2xs animate-pulse">
+                {unreadAnnouncementsCount}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px]">Pengumuman</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('messages')}
+          className={`flex flex-col items-center gap-1 py-1 px-2 rounded-xl transition-all relative ${
+            activeTab === 'messages' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <div className="relative">
+            <MessageSquare className="w-5 h-5" />
+            {unreadMessagesCount > 0 && (
+              <span className="absolute -top-1 -right-2 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-extrabold flex items-center justify-center animate-pulse">
+                {unreadMessagesCount}
+              </span>
+            )}
+          </div>
+          <span className="text-[10px]">Pesan</span>
         </button>
 
         <button

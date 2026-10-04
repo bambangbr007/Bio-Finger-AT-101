@@ -155,3 +155,45 @@ export interface SupabaseConfig {
     biometricTemplates: boolean;
   };
 }
+
+export interface ParentAccount {
+  id: string;
+  parentName: string;
+  studentName: string; // Nama anak digunakan sebagai Username login
+  studentId: string;
+  studentClass: string;
+  whatsappPhone: string;
+  password: string;
+  registeredAt: string;
+  lastResetAt?: string;
+  resetBy?: string; // 'ADMIN' | 'SUPER_ADMIN'
+  status: 'ACTIVE' | 'SUSPENDED';
+}
+
+export interface SchoolParentMessage {
+  id: string;
+  studentId: string;
+  studentName: string;
+  parentName: string;
+  parentPhone: string;
+  senderRole: 'SUPER_ADMIN' | 'ADMIN' | 'PARENT';
+  senderName: string;
+  subject?: string;
+  content: string; // Wajib diawali Assalamualaikum Wr. Wb. untuk pesan resmi
+  sentAt: string;
+  read: boolean;
+  channel: 'APP' | 'WHATSAPP' | 'BOTH';
+}
+
+export interface SchoolAnnouncement {
+  id: string;
+  title: string;
+  category: 'UMUM' | 'LIBUR' | 'UJIAN' | 'KEGIATAN' | 'RAPAT' | 'PHBI';
+  content: string;
+  targetClass: string; // 'SEMUA' or specific class e.g. 'Kelas 7A'
+  publishedAt: string;
+  authorName: string;
+  authorRole: string; // e.g. 'Kepala MTs Nurus Salam', 'Guru Piket / Kesiswaan'
+  priority: 'NORMAL' | 'PENTING';
+  pinned?: boolean;
+}
