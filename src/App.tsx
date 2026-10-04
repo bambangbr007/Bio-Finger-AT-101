@@ -19,10 +19,13 @@ const MainContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
-      <Header 
-        onOpenTrialKit={() => setIsTrialKitOpen(true)}
-        onOpenKiosk={() => setIsKioskOpen(true)}
-      />
+      {/* Gambar 2 (Header Desktop) tidak ditampilkan sama sekali di akun Orang Tua */}
+      {currentRole !== 'PARENT' && (
+        <Header 
+          onOpenTrialKit={() => setIsTrialKitOpen(true)}
+          onOpenKiosk={() => setIsKioskOpen(true)}
+        />
+      )}
 
       <main className="flex-1">
         {currentRole === 'PARENT' ? (
