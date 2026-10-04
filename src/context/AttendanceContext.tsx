@@ -57,8 +57,8 @@ interface AttendanceContextType {
 }
 
 const DEFAULT_CONFIG: SchoolConfig = {
-  schoolName: 'SMP / SMA NEGERI 1 BINTANG BANGSA',
-  schoolAddress: 'Jl. Pendidikan No. 45, Kompleks Akademik Terpadu',
+  schoolName: 'MTs Nurus Salam',
+  schoolAddress: 'Jl. Raya Gebang, Kompleks Pendidikan MTs Nurus Salam',
   academicYear: '2026/2027',
   semester: 'Ganjil',
   checkInStart: '06:00',

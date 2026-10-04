@@ -36,6 +36,66 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTrialKit, onOpenKiosk }) =
 
   const selectedStudent = students.find(s => s.id === selectedParentStudentId) || students[0];
 
+  // Khusus Akun Orang Tua Siswa: Hanya tampilkan Brand BIO Finger MTs Nurus Salam, Nama Wali, Nama Murid, dan Logout
+  if (currentRole === 'PARENT') {
+    const parentStudent = (currentUser?.studentId ? students.find(s => s.id === currentUser.studentId) : null)
+      || selectedStudent;
+
+    return (
+      <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-md">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16 gap-3">
+            
+            {/* Brand Logo & BIO Finger MTs Nurus Salam */}
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-blue-500/20 shrink-0">
+                <Fingerprint className="w-6 h-6 text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="font-bold text-sm sm:text-base tracking-tight truncate">
+                  BIO Finger <span className="text-blue-400 font-extrabold">MTs Nurus Salam</span>
+                </h1>
+                <p className="text-[11px] text-slate-400 truncate">
+                  Portal Resmi Presensi Siswa
+                </p>
+              </div>
+            </div>
+
+            {/* HANYA Nama Walimurid & Murid serta Tombol Keluar */}
+            <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 bg-slate-800/90 px-3 py-1.5 rounded-2xl border border-slate-700">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                  <Smartphone className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div className="text-left leading-tight">
+                  <div className="text-[11px] text-slate-300">
+                    <span className="text-slate-400 font-normal">Wali: </span>
+                    <strong className="text-white">{parentStudent?.parentName || currentUser?.name || 'Wali Murid'}</strong>
+                  </div>
+                  <div className="text-[11px] text-emerald-400">
+                    <span className="text-slate-400 font-normal">Murid: </span>
+                    <strong>{parentStudent?.name}</strong> <span className="text-[10px] text-slate-400">({parentStudent?.class})</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Logout Button */}
+              <button
+                onClick={() => logout()}
+                className="px-3 py-1.5 rounded-xl bg-slate-800/90 hover:bg-rose-600 active:scale-95 text-slate-300 hover:text-white border border-slate-700 hover:border-rose-500 transition-all text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                title="Keluar dari akun dan kembali ke halaman Login"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Keluar</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className="bg-slate-900 border-b border-slate-800 text-white sticky top-0 z-40 shadow-md">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
@@ -95,19 +155,19 @@ export const Header: React.FC<HeaderProps> = ({ onOpenTrialKit, onOpenKiosk }) =
                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold ${
                   currentRole === 'SUPER_ADMIN' 
                     ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
-                    : currentRole === 'ADMIN'
-                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
-                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    : 'bg-blue-500/20 text-blue-300 border border-blue-500/40'
                 }`}>
-                  {currentRole === 'SUPER_ADMIN' && <ShieldAlert className="w-4 h-4 text-amber-300" />}
-                  {currentRole === 'ADMIN' && <UserCheck className="w-4 h-4 text-blue-300" />}
-                  {currentRole === 'PARENT' && <Smartphone className="w-4 h-4 text-emerald-300" />}
+                  {currentRole === 'SUPER_ADMIN' ? (
+                    <ShieldAlert className="w-4 h-4 text-amber-300" />
+                  ) : (
+                    <UserCheck className="w-4 h-4 text-blue-300" />
+                  )}
                 </div>
 
                 <div className="text-left hidden sm:block">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
-                      {currentRole === 'SUPER_ADMIN' ? 'Super Admin' : currentRole === 'ADMIN' ? 'Admin / Guru' : 'Wali Murid'}
+                      {currentRole === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin / Guru'}
                     </span>
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                   </div>

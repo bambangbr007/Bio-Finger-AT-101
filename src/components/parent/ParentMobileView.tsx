@@ -26,19 +26,16 @@ export const ParentMobileView: React.FC = () => {
   const { 
     students, 
     selectedParentStudentId, 
-    setSelectedParentStudentId, 
     attendanceRecords, 
     activeDate, 
     schoolConfig,
     notificationLogs,
     permissions,
-    submitPermission
+    submitPermission,
+    currentUser
   } = useAttendance();
 
   const [activeTab, setActiveTab] = useState<'home' | 'history' | 'permission' | 'profile'>('home');
-  const [deviceFrameMode, setDeviceFrameMode] = useState<boolean>(false);
-  const [studentSearchOpen, setStudentSearchOpen] = useState<boolean>(false);
-  const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Form state for leave/sick submission
   const [permType, setPermType] = useState<'SAKIT' | 'IZIN'>('SAKIT');
@@ -46,16 +43,14 @@ export const ParentMobileView: React.FC = () => {
   const [permNote, setPermNote] = useState<string>('');
   const [submitSuccess, setSubmitSuccess] = useState<boolean>(false);
 
-  const currentStudent = students.find(s => s.id === selectedParentStudentId) || students[0];
+  // Kunci data secara ketat hanya untuk anak dari wali murid yang login
+  const currentStudent = (currentUser?.studentId ? students.find(s => s.id === currentUser.studentId) : null)
+    || students.find(s => s.id === selectedParentStudentId)
+    || students[0];
+
   const todayRecord = attendanceRecords.find(r => r.studentId === currentStudent.id && r.date === activeDate);
   const studentPermissions = permissions.filter(p => p.studentId === currentStudent.id);
   const studentNotifs = notificationLogs.filter(n => n.studentId === currentStudent.id);
-
-  const filteredStudents = students.filter(s => 
-    s.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    s.pin.includes(searchQuery) ||
-    s.class.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   const handleLeaveSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,18 +139,14 @@ export const ParentMobileView: React.FC = () => {
               <Fingerprint className="w-5 h-5 text-blue-200" />
             </div>
             <div>
-              <p className="text-[10px] text-blue-200 font-semibold tracking-wider uppercase">Portal Orang Tua Siswa</p>
-              <h2 className="text-sm font-bold truncate max-w-[190px]">{schoolConfig.schoolName}</h2>
+              <p className="text-[10px] text-blue-200 font-semibold tracking-wider uppercase">Portal Resmi Wali Murid</p>
+              <h2 className="text-sm font-bold truncate max-w-[220px]">BIO Finger MTs Nurus Salam</h2>
             </div>
           </div>
 
-          <button
-            onClick={() => setStudentSearchOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/25 text-xs text-blue-100 border border-white/20 backdrop-blur-sm transition-all"
-          >
-            <Search className="w-3.5 h-3.5" />
-            <span>Ganti Siswa</span>
-          </button>
+          <div className="px-2.5 py-1 rounded-full bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-bold">
+            Siswa Terverifikasi
+          </div>
         </div>
 
         {/* Student Profile Card (Hero) */}
@@ -630,100 +621,12 @@ export const ParentMobileView: React.FC = () => {
           <span className="text-[10px]">Profil</span>
         </button>
       </div>
-
-      {/* Modal: Student Selector (Allows testing all 480 students easily) */}
-      {studentSearchOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3">
-          <div className="bg-white rounded-2xl w-full max-w-sm max-h-[80vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200">
-            <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-bold">Pilih Akun Siswa (480 Siswa)</h4>
-                <p className="text-[11px] text-slate-400">Simulasi tampilan orang tua per siswa</p>
-              </div>
-              <button 
-                onClick={() => setStudentSearchOpen(false)}
-                className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center text-xs"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-3 border-b border-slate-100">
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Cari nama siswa, PIN BioFinger, atau kelas..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-slate-100 border border-transparent focus:bg-white focus:border-blue-500 focus:outline-none"
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2 divide-y divide-slate-100">
-              {filteredStudents.slice(0, 50).map(st => (
-                <button
-                  key={st.id}
-                  onClick={() => {
-                    setSelectedParentStudentId(st.id);
-                    setStudentSearchOpen(false);
-                  }}
-                  className={`w-full text-left p-2.5 rounded-xl flex items-center gap-2.5 transition-colors ${
-                    st.id === currentStudent.id ? 'bg-blue-50 text-blue-900' : 'hover:bg-slate-50'
-                  }`}
-                >
-                  <img src={st.avatarUrl} alt={st.name} className="w-8 h-8 rounded-lg bg-slate-200" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-800 truncate">{st.name}</p>
-                    <p className="text-[10px] text-slate-400">
-                      {st.class} • PIN: {st.pin} • Wali: {st.parentName}
-                    </p>
-                  </div>
-                  {st.id === currentStudent.id && (
-                    <span className="text-xs text-blue-600 font-bold">✓ Aktif</span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            <div className="p-2.5 bg-slate-50 border-t border-slate-100 text-center text-[11px] text-slate-500">
-              Menampilkan {Math.min(50, filteredStudents.length)} dari 480 siswa
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-900/90 py-0 sm:py-6">
-      {/* Device Frame Switcher Banner for Desktop Testers */}
-      <div className="max-w-md mx-auto mb-3 px-3 flex items-center justify-between text-xs text-slate-300">
-        <div className="flex items-center gap-1.5">
-          <Smartphone className="w-4 h-4 text-emerald-400" />
-          <span className="font-medium">Mode Hp Orang Tua: Pas Layar, 0 Delay</span>
-        </div>
-        <button
-          onClick={() => setDeviceFrameMode(!deviceFrameMode)}
-          className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] border border-slate-700"
-        >
-          {deviceFrameMode ? 'Layar Penuh' : 'Frame Mockup HP'}
-        </button>
-      </div>
-
-      {deviceFrameMode ? (
-        <div className="max-w-sm mx-auto my-4 bg-slate-950 p-3 rounded-[40px] shadow-2xl border-4 border-slate-800">
-          <div className="w-32 h-4 bg-slate-800 rounded-full mx-auto mb-2"></div>
-          <div className="rounded-[30px] overflow-hidden bg-white">
-            {content}
-          </div>
-        </div>
-      ) : (
-        content
-      )}
+    <div className="min-h-screen bg-slate-100 flex justify-center py-0 sm:py-6">
+      {content}
     </div>
   );
 };
